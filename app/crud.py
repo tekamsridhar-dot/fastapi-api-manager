@@ -1,57 +1,84 @@
 from sqlalchemy.orm import Session
 from .import models,schemas
+from .auth import get_password_hash,verify_password
 
-def create_task(db:Session,task: schemas.TaskCreate):
-    db_task = models.Task(
-        title=task.title,
-        description=task.description,
-        status=task.status       
+def authenticate_user(db:Session,email: str,password:str):
+     user=get_user(db,email)
+     if not user:
+          return None
+     if not verify_password(password,user.hashed_password):
+          return None
+     return user
+
+def get_user(db:Session,email:str):
+     return db.query(models.user).filter(models.user.email==email).first()
+
+def create_user(db:Session,user: schemas.usercreate):
+    existing_user=get_user(db,user.email)
+    if existing_user:
+         return None
+    
+    hashed_password=get_password_hash(user.password)
+
+    db_user = models.user(
+        full_name=user.full_name,
+        email=user.email,
+        hashed_password=hashed_password       
     )
 
-    db.add(db_task)
+    db.add(db_user)
     db.commit()
-    db.refresh(db_task)
+    db.refresh(db_user)
 
-    return db_task
+    return db_user
 
-def get_tasks(db:Session,
-              title:str=None,
-              description:str=None,
-              status:str=None,
-              skip: int=0,
-              limit:int=10):
-            query=db.query(models.Task)
-            if title:
-                 query=query.filter(models.Task.title.ilike(f"%{title}%"))
-            if status:
-                 query=query.filter(models.task.status == status)
-            tasks=query=query.offset(skip).limit(limit).all()
-            return tasks
+#crud
+def create_task(db:Session,task:schemas.TaskCreate,user_id:int):
+     db_task=models.Task(
+          title=task.title,
+          description=task.description,
+          status=task.status,
+          user_id=user_id
+     )
+     db.add(db_task)
+     db.commit()
+     db.refresh(db_task)
 
-def update_task(db:Session,task_id:int,task: schemas.Taskupdate):
-    db_task =db.query(models.Task).filter(
-        models.Task.id == task_id
-    ).first()
+     return db_task
 
+def get_task(db:Session,user_id:int):
+     return db.query(models.Task).filter(
+          models.Task.user_id==user_id
+     ).all()
+
+def get_task(db:Session,task_id:int,user_id:int):
+     return db.query(models.Task).filter(
+          models.Task.id==task_id,
+          models.Task.user_id==user_id
+     ).first()
+
+def update_task(
+          db:Session,
+          task_id:int,
+          task:schemas.Taskupdate,
+          user_id:int
+):
+    db_task=get_task(db,task_id,user_id)
     if not db_task:
         return None
-    
     db_task.title=task.title
     db_task.description=task.description
     db_task.status=task.status
 
     db.commit()
     db.refresh(db_task)
-
     return db_task
 
-def delete_task(db:Session,task_id:int):
-    db_task = db.query(models.task).filter(
-        models.Task.id == task_id).first()
-
+def delete_task(db:Session,task_id:int,user_id:int):
+    
+    db_task=get_task(db,task_id,user_id)
     if not db_task:
-        return None
+         return None
     db.delete(db_task)
     db.commit()
-
     return db_task

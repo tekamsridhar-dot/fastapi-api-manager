@@ -1,5 +1,16 @@
-from sqlalchemy import Column,Integer,String
-from .database import Base 
+from sqlalchemy import Column,Integer,String,ForeignKey,DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from .database import Base
+
+class user(Base):
+    __tablename__="users"
+    id=Column(Integer,primary_key=True,index=True)
+    full_name=Column(String,nullable=False)
+    email=Column(String,unique=True,index=True,nullable=False)
+    hashed_password=Column(String,nullable=False)
+    created=Column(DateTime,default=datetime.utcnow)
+    tasks=relationship("Task",back_populates="owner")
 
 class Task(Base):
     __tablename__="tasks"
@@ -7,4 +18,7 @@ class Task(Base):
     title=Column(String,nullable=False)
     description=Column(String)
     status=Column(String,default="Pending")
+
+    user_id=Column(Integer,ForeignKey("users.id"))
+    owner=relationship("user",back_populates="tasks")
 
